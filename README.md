@@ -156,11 +156,5 @@ makes no claim about real-world regulation.
 
 ---
 
-## Definition of done (protect this; cut everything else)
-DataHub up with the Northstar graph → agent reads impact via MCP → engine produces
-the card → agent writes one assessment back → it's visible in the DataHub UI →
-3-min video + this README + Apache-2.0 LICENSE + public repo. Streamlit UI, the
-ML-agent angle, structured properties, and multiple regulations are all **stretch**.
-
 ## License
 Apache 2.0 — see [LICENSE](LICENSE).
