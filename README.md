@@ -1,9 +1,23 @@
-# RegLens
+<div align="center">
 
-**A regulatory-change *investment decision* agent, built on DataHub.**
+# 🔍 RegLens
 
-Most tools answer *"what does this regulation affect?"* RegLens answers the
-question a bank actually has to act on: *"should we implement this now, defer it,
+### A regulatory-change **investment-decision** agent, built on DataHub.
+
+*Don't just find what a regulation touches — decide what to do about it.*
+
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![Built on DataHub](https://img.shields.io/badge/Built%20on-DataHub-1890FF)](https://datahubproject.io/)
+[![Powered by MCP](https://img.shields.io/badge/Powered%20by-MCP-6E56CF)](https://modelcontextprotocol.io/)
+[![Hackathon](https://img.shields.io/badge/Build%20with%20DataHub-Agents%20That%20Do%20Real%20Work-black)](#)
+
+</div>
+
+---
+
+Most tools answer *"what does this regulation affect?"* **RegLens answers the
+question a bank actually has to act on:** *"should we implement this now, defer it,
 or do the minimum — and what does each cost?"*
 
 It reads a bank's live data environment **through the DataHub MCP server** to
@@ -11,12 +25,18 @@ discover what a regulation touches (via lineage), costs three implementation pat
 with a transparent scenario engine, and **writes the decision back into DataHub**
 so the next person or agent inherits the assessment instead of rediscovering it.
 
-> Built for *Build with DataHub: The Agent Hackathon*. Challenge category:
-> **Agents That Do Real Work**.
+> 🏆 Built for *Build with DataHub: The Agent Hackathon* — category **Agents That Do Real Work**.
+
+### Why it's different
+
+- 🎯 **Decision, not description** — costs `ACT NOW` / `DEFER` / `MIN. COMPLIANCE`, not just impact.
+- 🔗 **Reads *and* writes the graph** — discovers via lineage, then contributes the decision back.
+- 🧮 **Transparent economics** — every £ carries an assumption *and* a confidence.
+- 🙋 **Human in the loop** — nothing is written until a person approves.
 
 ---
 
-## The 60-second story
+## ⏱️ The 60-second story
 
 ```
         RCS-2026 (a new regulation)
@@ -47,7 +67,7 @@ Example output is in [`examples/`](examples/) — the
 
 ---
 
-## Setup runbook
+## 🚀 Setup runbook
 
 > **De-risk in this order.** The only thing that can sink this project is the
 > DataHub + MCP round-trip. Get steps 1–4 green *before* touching agent logic.
@@ -103,11 +123,11 @@ python -m reglens.agent.reglens_agent --reg RCS-2026 --no-mcp --dry-run
 ```
 After a real write-back, refresh `customer_risk_profile` in the UI: the glossary
 term `RegLens.RCS-2026.<decision>` and the assessment description are now on the
-asset. **That's the money shot.**
+asset. **That's the money shot.** 💰
 
 ---
 
-## How it uses DataHub (for the judges)
+## 🧑‍⚖️ How it uses DataHub (for the judges)
 
 | Judging axis | What RegLens does |
 |---|---|
@@ -117,13 +137,13 @@ asset. **That's the money shot.**
 | **Real-world usefulness** | Change-capacity triage is a real, expensive problem for every regulated bank. |
 | **Submission quality** | This README, a <3-min demo ([`demo/demo_script.md`](demo/demo_script.md)), and sample outputs in `examples/`. |
 
-**The write-back is the point.** It maps directly to *"Agents That Do Real Work:
-takes action, and writes results back so the next person or agent inherits the
-knowledge."*
+> 💡 **The write-back is the point.** It maps directly to *"Agents That Do Real Work:
+> takes action, and writes results back so the next person or agent inherits the
+> knowledge."*
 
 ---
 
-## Architecture
+## 🏗️ Architecture
 
 ```
 reglens/
@@ -142,19 +162,20 @@ reglens/
 ```
 
 ### What's real vs. what's a documented shortcut
-- **Real:** DataHub graph, MCP read round-trip, scenario engine, SDK write-back,
+- ✅ **Real:** DataHub graph, MCP read round-trip, scenario engine, SDK write-back,
   human gate.
-- **Shortcut (documented, safe to ship):** the MCP lineage result is proven to
+- 🔧 **Shortcut (documented, safe to ship):** the MCP lineage result is proven to
   round-trip but parsed via the deterministic closure of the *same* seeded graph —
   so the card is always populated. Tightening that parse against your MCP server's
   result shape is the first `TODO`. Reports/pipelines/model are seeded as datasets
   with subtypes for uniform lineage; promoting them to real `Dashboard`/`MLModel`
   entities is an optional upgrade, also marked `TODO`.
 
-The regulation **RCS-2026** and its issuer are **fictional on purpose**, so RegLens
-makes no claim about real-world regulation.
+> ⚠️ The regulation **RCS-2026** and its issuer are **fictional on purpose**, so RegLens
+> makes no claim about real-world regulation.
 
 ---
 
-## License
+## 📄 License
+
 Apache 2.0 — see [LICENSE](LICENSE).
