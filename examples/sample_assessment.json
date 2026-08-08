@@ -1,0 +1,233 @@
+{
+  "regulation_id": "RCS-2026",
+  "regulation_title": "Enhanced Customer Risk Classification Standard",
+  "impact": "HIGH",
+  "deadline_months": 12,
+  "affected_assets": [
+    {
+      "urn": "urn:li:dataset:(urn:li:dataPlatform:snowflake,risk.customer_risk_profile,PROD)",
+      "name": "risk.customer_risk_profile",
+      "entity_type": "dataset",
+      "role": "Per-customer risk tier. Directly in scope for RCS-2026."
+    },
+    {
+      "urn": "urn:li:dataset:(urn:li:dataPlatform:snowflake,ml.risk_scoring_model,PROD)",
+      "name": "ml.risk_scoring_model",
+      "entity_type": "mlModel",
+      "role": "Model that assigns risk tiers. Retrain/revalidate is the expensive part of RCS-2026."
+    },
+    {
+      "urn": "urn:li:dataset:(urn:li:dataPlatform:snowflake,dash.risk_committee_report,PROD)",
+      "name": "dash.risk_committee_report",
+      "entity_type": "dashboard",
+      "role": "Monthly risk committee report."
+    },
+    {
+      "urn": "urn:li:dataset:(urn:li:dataPlatform:snowflake,pipe.risk_scoring_pipeline,PROD)",
+      "name": "pipe.risk_scoring_pipeline",
+      "entity_type": "dataFlow",
+      "role": "Scores customers nightly using the model."
+    },
+    {
+      "urn": "urn:li:dataset:(urn:li:dataPlatform:snowflake,report.regulatory_risk_report,PROD)",
+      "name": "report.regulatory_risk_report",
+      "entity_type": "dataset",
+      "role": "Regulatory risk report submitted to the supervisor. In scope for RCS-2026."
+    },
+    {
+      "urn": "urn:li:dataset:(urn:li:dataPlatform:snowflake,pipe.capital_reporting_pipeline,PROD)",
+      "name": "pipe.capital_reporting_pipeline",
+      "entity_type": "dataFlow",
+      "role": "Feeds the capital adequacy calculation."
+    },
+    {
+      "urn": "urn:li:dataset:(urn:li:dataPlatform:snowflake,dash.supervisory_submission_pack,PROD)",
+      "name": "dash.supervisory_submission_pack",
+      "entity_type": "dashboard",
+      "role": "Supervisory submission pack."
+    },
+    {
+      "urn": "urn:li:dataset:(urn:li:dataPlatform:snowflake,report.capital_adequacy_input,PROD)",
+      "name": "report.capital_adequacy_input",
+      "entity_type": "dataset",
+      "role": "Capital adequacy calculation input."
+    },
+    {
+      "urn": "urn:li:dataset:(urn:li:dataPlatform:snowflake,dash.capital_reporting_dashboard,PROD)",
+      "name": "dash.capital_reporting_dashboard",
+      "entity_type": "dashboard",
+      "role": "Board-level capital reporting dashboard."
+    }
+  ],
+  "scenarios": [
+    {
+      "decision": "ACT_NOW",
+      "cost_of_action": [
+        {
+          "label": "People / engineering",
+          "value": 1620000,
+          "unit": "GBP",
+          "assumption": "9 affected assets x \u00a3180,000",
+          "confidence": 0.6
+        },
+        {
+          "label": "Model rebuild + revalidation",
+          "value": 1600000,
+          "unit": "GBP",
+          "assumption": "Retrain + independent validation of production risk model",
+          "confidence": 0.45
+        },
+        {
+          "label": "Report re-certification",
+          "value": 1500000,
+          "unit": "GBP",
+          "assumption": "6 regulatory reports/dashboards x \u00a3250,000",
+          "confidence": 0.6
+        },
+        {
+          "label": "Vendor / assurance",
+          "value": 700000,
+          "unit": "GBP",
+          "assumption": "External methodology + assurance",
+          "confidence": 0.55
+        },
+        {
+          "label": "Programme overhead",
+          "value": 1084000,
+          "unit": "GBP",
+          "assumption": "20% PMO/change",
+          "confidence": 0.7
+        }
+      ],
+      "cost_of_inaction": [
+        {
+          "label": "Regulatory penalty exposure",
+          "value": 0,
+          "unit": "GBP",
+          "assumption": "Compliant on time \u2014 no penalty exposure",
+          "confidence": 0.85
+        }
+      ],
+      "opportunity_cost": [
+        {
+          "label": "Displaces Core Banking Migration",
+          "value": 5000000,
+          "unit": "GBP",
+          "assumption": "Full capacity draw slips the strategic programme ~6 months",
+          "confidence": 0.5
+        }
+      ],
+      "duration_months": 9,
+      "change_capacity_fte_years": 54,
+      "displaced_initiative": "Core Banking Migration",
+      "notes": "Full methodology rebuild incl. model revalidation. Compliant on time."
+    },
+    {
+      "decision": "MINIMUM_COMPLIANCE",
+      "cost_of_action": [
+        {
+          "label": "People / engineering (scoped)",
+          "value": 891000,
+          "unit": "GBP",
+          "assumption": "Rule-level changes, no full model rebuild",
+          "confidence": 0.5
+        },
+        {
+          "label": "Report re-certification",
+          "value": 825000,
+          "unit": "GBP",
+          "assumption": "Re-cert only directly-affected reports",
+          "confidence": 0.55
+        },
+        {
+          "label": "Vendor (limited)",
+          "value": 280000,
+          "unit": "GBP",
+          "assumption": "Lighter external assurance",
+          "confidence": 0.5
+        },
+        {
+          "label": "Programme overhead",
+          "value": 399200,
+          "unit": "GBP",
+          "assumption": "20% PMO/change",
+          "confidence": 0.7
+        }
+      ],
+      "cost_of_inaction": [
+        {
+          "label": "Residual supervisory risk",
+          "value": 840000,
+          "unit": "GBP",
+          "assumption": "Reduced but non-zero risk of a methodology finding",
+          "confidence": 0.4
+        }
+      ],
+      "opportunity_cost": [
+        {
+          "label": "Strategic capacity preserved",
+          "value": 1000000,
+          "unit": "GBP",
+          "assumption": "Minor draw on the strategic programme",
+          "confidence": 0.5
+        }
+      ],
+      "duration_months": 5,
+      "change_capacity_fte_years": 20,
+      "displaced_initiative": "Partial \u2014 strategic capacity largely preserved",
+      "notes": "Meets the letter via rule patch; full model rebuild scheduled later."
+    },
+    {
+      "decision": "DEFER",
+      "cost_of_action": [
+        {
+          "label": "Near-term build",
+          "value": 0,
+          "unit": "GBP",
+          "assumption": "No build in the deferral window",
+          "confidence": 0.9
+        },
+        {
+          "label": "Future implementation uplift",
+          "value": 780480,
+          "unit": "GBP",
+          "assumption": "~12% dearer once deferred",
+          "confidence": 0.4
+        }
+      ],
+      "cost_of_inaction": [
+        {
+          "label": "Expected penalty",
+          "value": 2100000,
+          "unit": "GBP",
+          "assumption": "P(penalty)=0.35 x \u00a36,000,000",
+          "confidence": 0.35
+        },
+        {
+          "label": "Remediation (mid)",
+          "value": 2300000,
+          "unit": "GBP",
+          "assumption": "Range \u00a31,100,000\u2013\u00a33,500,000",
+          "confidence": 0.35
+        }
+      ],
+      "opportunity_cost": [
+        {
+          "label": "Strategic capacity preserved",
+          "value": 0,
+          "unit": "GBP",
+          "assumption": "No displacement in the window",
+          "confidence": 0.7
+        }
+      ],
+      "duration_months": 12,
+      "change_capacity_fte_years": 0.0,
+      "displaced_initiative": "None now \u2014 capacity preserved short term",
+      "notes": "Do nothing for 6 months. Carries penalty + remediation + cost uplift."
+    }
+  ],
+  "recommendation": "MINIMUM_COMPLIANCE",
+  "rationale": "MINIMUM_COMPLIANCE has the lowest expected total cost (\u00a34,235,200) vs next-best DEFER (\u00a35,180,480); margin \u00a3945,280. Meets the letter via rule patch; full model rebuild scheduled later.",
+  "confidence": 0.53,
+  "assessment_date": "2026-08-08"
+}

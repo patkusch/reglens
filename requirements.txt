@@ -1,0 +1,9 @@
+# Core: DataHub SDK (seed + SDK write-back path)
+acryl-datahub>=1.0.0
+
+# Agent <-> DataHub MCP server (stdio). The server itself is run via `uvx`.
+mcp>=1.0.0
+
+# Optional: LLM driver for the regulatory-analysis reasoning step.
+# The core loop runs fully deterministic without this.
+anthropic>=0.40.0

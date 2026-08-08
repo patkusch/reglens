@@ -1,0 +1,15 @@
+{
+  "glossary_term": "RegLens.RCS-2026.MINIMUM_COMPLIANCE",
+  "description": "[RegLens assessment 2026-08-08] RCS-2026 (Enhanced Customer Risk Classification Standard). Impact: HIGH. Decision: MINIMUM_COMPLIANCE (confidence 0.53). MINIMUM_COMPLIANCE has the lowest expected total cost (\u00a34,235,200) vs next-best DEFER (\u00a35,180,480); margin \u00a3945,280. Meets the letter via rule patch; full model rebuild scheduled later.",
+  "targets": [
+    "urn:li:dataset:(urn:li:dataPlatform:snowflake,risk.customer_risk_profile,PROD)",
+    "urn:li:dataset:(urn:li:dataPlatform:snowflake,ml.risk_scoring_model,PROD)",
+    "urn:li:dataset:(urn:li:dataPlatform:snowflake,dash.risk_committee_report,PROD)",
+    "urn:li:dataset:(urn:li:dataPlatform:snowflake,pipe.risk_scoring_pipeline,PROD)",
+    "urn:li:dataset:(urn:li:dataPlatform:snowflake,report.regulatory_risk_report,PROD)",
+    "urn:li:dataset:(urn:li:dataPlatform:snowflake,pipe.capital_reporting_pipeline,PROD)",
+    "urn:li:dataset:(urn:li:dataPlatform:snowflake,dash.supervisory_submission_pack,PROD)",
+    "urn:li:dataset:(urn:li:dataPlatform:snowflake,report.capital_adequacy_input,PROD)",
+    "urn:li:dataset:(urn:li:dataPlatform:snowflake,dash.capital_reporting_dashboard,PROD)"
+  ]
+}
