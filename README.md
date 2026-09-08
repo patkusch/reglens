@@ -125,6 +125,16 @@ After a real write-back, refresh `customer_risk_profile` in the UI: the glossary
 term `RegLens.RCS-2026.<decision>` and the assessment description are now on the
 asset. **That's the money shot.** 💰
 
+### 6. Check the glass box
+```bash
+pip install -r requirements-dev.txt && python -m pytest -q
+```
+No DataHub needed. The tests walk the seeded lineage, re-derive every scenario
+total from the named assumptions, check the recommendation is the cheapest
+expected path, and re-run the demo against
+[`examples/sample_assessment.json`](examples/sample_assessment.json) so the
+committed example cannot drift from the code.
+
 ---
 
 ## 🧑‍⚖️ How it uses DataHub (for the judges)
