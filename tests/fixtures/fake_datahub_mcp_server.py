@@ -29,7 +29,10 @@ from __future__ import annotations
 
 import asyncio
 
-from mcp.server.mcpserver import MCPServer
+try:  # mcp 1.x
+    from mcp.server.fastmcp import FastMCP as _MCPServerImpl
+except ImportError:  # mcp 2.x renamed FastMCP -> MCPServer
+    from mcp.server.mcpserver import MCPServer as _MCPServerImpl
 
 PLATFORM = "snowflake"
 ENV = "PROD"
@@ -109,7 +112,7 @@ def _entity_dict(name: str) -> dict:
     return entity
 
 
-srv = MCPServer("fake-datahub-lineage-test")
+srv = _MCPServerImpl("fake-datahub-lineage-test")
 
 
 @srv.tool()

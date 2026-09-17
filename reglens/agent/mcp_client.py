@@ -119,18 +119,28 @@ class DataHubMCP:
     def decode_result(res: object) -> dict:
         """Decode a `call_tool` result into the plain dict the server sent back.
 
-        MCP tool results can carry a `structured_content` dict directly (when
-        the server declares an output schema), or only the legacy `content`
-        list of text blocks, whose first text block is the JSON payload — the
-        DataHub MCP server currently does the latter. Both are handled here
-        rather than assumed, and an error result raises instead of being
-        silently treated as an empty/successful payload.
+        MCP tool results can carry a structured-content dict directly (when the
+        server declares an output schema), or only the legacy `content` list of
+        text blocks, whose first text block is the JSON payload — the DataHub
+        MCP server currently does the latter. Both are handled here rather than
+        assumed, and an error result raises instead of being silently treated
+        as an empty/successful payload. The attribute is `is_error`/
+        `structured_content` on `mcp>=2` and `isError`/`structuredContent` on
+        `mcp<2` (the SDK's own v1->v2 migration renamed them) — both spellings
+        are checked so this works whichever the environment resolved.
         """
-        if getattr(res, "is_error", False):
+        is_error = getattr(res, "is_error", None)
+        if is_error is None:
+            is_error = getattr(res, "isError", False)
+        if is_error:
             raise RuntimeError(f"MCP tool call returned an error: {res!r}")
+
         structured = getattr(res, "structured_content", None)
+        if structured is None:
+            structured = getattr(res, "structuredContent", None)
         if isinstance(structured, dict):
             return structured
+
         for block in getattr(res, "content", None) or []:
             text = getattr(block, "text", None)
             if text:
