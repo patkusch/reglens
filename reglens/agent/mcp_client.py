@@ -14,6 +14,7 @@ server exposes.
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 
 from reglens.config import MCP_ARGS, MCP_COMMAND, MCP_MUTATION_ENABLED
@@ -79,9 +80,27 @@ class DataHubMCP:
         name = self._find_tool("search") or "search"
         return await self.call(name, query=query)
 
-    async def get_lineage(self, urn: str, direction: str = "DOWNSTREAM") -> object:
+    async def get_lineage(
+        self,
+        urn: str,
+        direction: str = "DOWNSTREAM",
+        max_hops: int = 3,
+        max_results: int = 100,
+    ) -> object:
+        """Fetch lineage for `urn` in the given direction.
+
+        The real DataHub MCP server's `get_lineage` tool takes `upstream: bool`,
+        not a `direction` string (verified against acryldata/mcp-server-datahub's
+        `tools/lineage.py`) — `direction` here is just this wrapper's friendlier
+        parameter name. `max_hops=3` is documented by that tool as "equivalent
+        to unlimited hops", which is what gives RegLens the full downstream
+        closure in a single call.
+        """
         name = self._find_tool("lineage") or "get_lineage"
-        return await self.call(name, urn=urn, direction=direction)
+        upstream = direction.upper() == "UPSTREAM"
+        return await self.call(
+            name, urn=urn, upstream=upstream, max_hops=max_hops, max_results=max_results
+        )
 
     # ---- write-back (mutation) ----
     async def add_glossary_term(self, urn: str, term: str) -> object:
@@ -95,6 +114,28 @@ class DataHubMCP:
         if not name:
             raise RuntimeError(f"No description mutation tool found in: {self.tool_names}")
         return await self.call(name, urn=urn, description=description)
+
+    @staticmethod
+    def decode_result(res: object) -> dict:
+        """Decode a `call_tool` result into the plain dict the server sent back.
+
+        MCP tool results can carry a `structured_content` dict directly (when
+        the server declares an output schema), or only the legacy `content`
+        list of text blocks, whose first text block is the JSON payload — the
+        DataHub MCP server currently does the latter. Both are handled here
+        rather than assumed, and an error result raises instead of being
+        silently treated as an empty/successful payload.
+        """
+        if getattr(res, "is_error", False):
+            raise RuntimeError(f"MCP tool call returned an error: {res!r}")
+        structured = getattr(res, "structured_content", None)
+        if isinstance(structured, dict):
+            return structured
+        for block in getattr(res, "content", None) or []:
+            text = getattr(block, "text", None)
+            if text:
+                return json.loads(text)
+        raise ValueError(f"Could not decode a JSON payload out of MCP result: {res!r}")
 
 
 async def _print_tools() -> None:

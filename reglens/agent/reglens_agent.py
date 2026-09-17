@@ -63,22 +63,33 @@ def discover_impact_deterministic() -> list[AffectedAsset]:
 async def discover_impact_via_mcp() -> list[AffectedAsset]:
     """Preferred path: read the graph through the DataHub MCP server.
 
-    We keep the parsing intentionally light — the MCP result shapes are logged so
-    you can tighten extraction against your server version. Falls back to the
-    deterministic closure on any error so the demo never dies mid-take.
+    Parses the MCP server's actual `get_lineage` response (see
+    `reglens.agent.lineage_parser`) — every URN, name, type and hop count in the
+    resulting assets comes from that response, not from `reglens.seed.graph`.
+    Falls back to the deterministic closure on any error (no MCP server, an
+    unexpected response shape, ...) so the demo never dies mid-take.
     """
+    from reglens.agent.lineage_parser import parse_lineage_assets
     from reglens.agent.mcp_client import DataHubMCP
+
+    anchor_urn = graph.dataset_urn(ANCHOR)
+    _anchor_subtype, anchor_desc = graph.NAME_TO_META.get(ANCHOR, ("Table", ""))
 
     try:
         async with DataHubMCP() as mcp:
             print(f"[mcp] connected. tools: {', '.join(mcp.tool_names)}")
-            anchor_urn = graph.dataset_urn(ANCHOR)
             _ = await mcp.search("customer risk classification")
-            lineage = await mcp.get_lineage(anchor_urn, direction="DOWNSTREAM")
-            print(f"[mcp] lineage result received ({type(lineage).__name__}).")
-            # TODO: parse `lineage` into URNs. Until wired, use the closure so the
-            # card is populated — the READ round-trip above is the integration proof.
-            return discover_impact_deterministic()
+            raw = await mcp.get_lineage(anchor_urn, direction="DOWNSTREAM")
+            lineage = DataHubMCP.decode_result(raw)
+            hits = len(lineage.get("downstreams", {}).get("searchResults", []))
+            print(f"[mcp] lineage result received: {hits} downstream hit(s).")
+            return parse_lineage_assets(
+                lineage,
+                anchor_urn=anchor_urn,
+                anchor_name=ANCHOR,
+                anchor_role=anchor_desc,
+                direction="DOWNSTREAM",
+            )
     except Exception as e:  # noqa: BLE001
         print(f"[mcp] unavailable ({e}); using deterministic closure.")
         return discover_impact_deterministic()

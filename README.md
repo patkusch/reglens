@@ -131,9 +131,11 @@ pip install -r requirements-dev.txt && python -m pytest -q
 ```
 No DataHub needed. The tests walk the seeded lineage, re-derive every scenario
 total from the named assumptions, check the recommendation is the cheapest
-expected path, and re-run the demo against
+expected path, re-run the demo against
 [`examples/sample_assessment.json`](examples/sample_assessment.json) so the
-committed example cannot drift from the code.
+committed example cannot drift from the code, and drive a real (subprocess,
+stdio) MCP round trip against a fake DataHub MCP server to prove the lineage
+parser reads whatever the server actually returns.
 
 ---
 
@@ -166,20 +168,31 @@ reglens/
     impact_card.py      # renders the Impact & Decision Card + write-back payload
   agent/
     mcp_client.py       # async wrapper over the DataHub MCP server (stdio via uvx)
+    lineage_parser.py   # parses the MCP server's actual get_lineage response shape
     reglens_agent.py    # orchestrator + CLI + human-approval gate
     writeback.py        # reliable SDK write-back path
   models.py             # shared dataclasses
 ```
 
 ### What's real vs. what's a documented shortcut
-- ✅ **Real:** DataHub graph, MCP read round-trip, scenario engine, SDK write-back,
-  human gate.
-- 🔧 **Shortcut (documented, safe to ship):** the MCP lineage result is proven to
-  round-trip but parsed via the deterministic closure of the *same* seeded graph —
-  so the card is always populated. Tightening that parse against your MCP server's
-  result shape is the first `TODO`. Reports/pipelines/model are seeded as datasets
-  with subtypes for uniform lineage; promoting them to real `Dashboard`/`MLModel`
-  entities is an optional upgrade, also marked `TODO`.
+- ✅ **Real:** DataHub graph, MCP read round-trip — including genuinely parsing
+  the lineage result (see below) — scenario engine, SDK write-back, human gate.
+- ✅ **MCP lineage parse, tightened:** `discover_impact_via_mcp()` used to call
+  the MCP server, throw the response away, and return the deterministic closure
+  of the *same* seeded graph regardless of what came back. It now parses the
+  server's actual `get_lineage` response (`reglens/agent/lineage_parser.py`) —
+  every URN, name, entity type and hop count in the resulting assets comes from
+  that response, not from `reglens/seed/graph.py`. Proven in
+  `tests/test_mcp_lineage_roundtrip.py`, which drives a real stdio MCP round
+  trip against a fake DataHub MCP server whose lineage graph has a different
+  shape (a fan-out, a 4-hop chain, a convergence, a cycle) from the seeded
+  Northstar graph, so the old shortcut couldn't have passed it by coincidence.
+  It still falls back to the deterministic closure if the server is
+  unreachable or the response is unexpected, so the demo never dies mid-take.
+- 🔧 **Shortcut (documented, safe to ship):** Reports/pipelines/model are still
+  seeded as `Dataset`s with subtypes for uniform lineage handling. Promoting
+  them to real `Dashboard`/`MLModel` entities remains an optional upgrade,
+  marked `TODO` in `reglens/seed/seed_northstar.py`.
 
 > ⚠️ The regulation **RCS-2026** and its issuer are **fictional on purpose**, so RegLens
 > makes no claim about real-world regulation.
