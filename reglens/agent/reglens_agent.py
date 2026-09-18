@@ -47,11 +47,11 @@ def _downstream(anchor: str) -> list[str]:
 
 
 def _as_asset(name: str) -> AffectedAsset:
-    subtype, desc = graph.NAME_TO_META.get(name, ("Table", ""))
+    _kind, desc = graph.NAME_TO_META.get(name, ("Table", ""))
     return AffectedAsset(
-        urn=graph.dataset_urn(name),
+        urn=graph.urn_for(name),
         name=name,
-        entity_type=graph.SUBTYPE_TO_ENTITY.get(subtype, "dataset"),
+        entity_type=graph.entity_type_of(name),
         role=desc,
     )
 
@@ -72,8 +72,8 @@ async def discover_impact_via_mcp() -> list[AffectedAsset]:
     from reglens.agent.lineage_parser import parse_lineage_assets
     from reglens.agent.mcp_client import DataHubMCP
 
-    anchor_urn = graph.dataset_urn(ANCHOR)
-    _anchor_subtype, anchor_desc = graph.NAME_TO_META.get(ANCHOR, ("Table", ""))
+    anchor_urn = graph.urn_for(ANCHOR)
+    _anchor_kind, anchor_desc = graph.NAME_TO_META.get(ANCHOR, ("Table", ""))
 
     try:
         async with DataHubMCP() as mcp:

@@ -18,8 +18,16 @@ from reglens.seed import graph
 ROOT = Path(__file__).resolve().parent.parent
 
 
+_URN_FOR_TYPE = {
+    "dataset": graph.dataset_urn,
+    "dashboard": graph.dashboard_urn,
+    "mlModel": graph.ml_model_urn,
+    "dataJob": graph.data_job_urn,
+}
+
+
 def asset(name: str, entity_type: str = "dataset") -> AffectedAsset:
-    return AffectedAsset(urn=graph.dataset_urn(name), name=name, entity_type=entity_type, role="test")
+    return AffectedAsset(urn=_URN_FOR_TYPE[entity_type](name), name=name, entity_type=entity_type, role="test")
 
 
 # ── The seeded graph ────────────────────────────────────────────────────────
@@ -30,9 +38,18 @@ class TestGraph:
         assert len(names) == len(graph.ASSETS), "asset names are unique"
         for up, down in graph.LINEAGE:
             assert up in names and down in names, (up, down)
-        for name, subtype, _desc, fields, owner in graph.ASSETS:
-            assert subtype in graph.SUBTYPE_TO_ENTITY, name
+        for name, kind, _desc, fields, owner in graph.ASSETS:
+            assert kind in graph.KIND_TO_ENTITY, name
             assert fields and owner, name
+
+    def test_every_lineage_edge_is_one_datahub_can_store(self):
+        # No invented edges: a model has no dataset parent and a dashboard has no job
+        # parent in DataHub, so the seed must route them through the entities DataHub
+        # actually links (a training job for the model).
+        for up, down in graph.LINEAGE:
+            pair = (graph.entity_type_of(up), graph.entity_type_of(down))
+            assert pair in graph.DATAHUB_LINEAGE_EDGES, (up, down, pair)
+        assert ("dataset", "mlModel") not in graph.DATAHUB_LINEAGE_EDGES
 
     def test_lineage_is_acyclic(self):
         adj: dict[str, list[str]] = {}
@@ -56,7 +73,7 @@ class TestGraph:
         names = [a.name for a in discover_impact_deterministic()]
         assert names[0] == ANCHOR
         assert len(names) == len(set(names)), "no asset twice"
-        for must in ("ml.risk_scoring_model", "report.regulatory_risk_report",
+        for must in ("pipe.risk_model_training", "ml.risk_scoring_model", "report.regulatory_risk_report",
                      "dash.supervisory_submission_pack", "dash.capital_reporting_dashboard",
                      "dash.risk_committee_report"):
             assert must in names, must
@@ -69,11 +86,34 @@ class TestGraph:
 
     def test_assets_carry_datahub_entity_types_and_urns(self):
         by_name = {a.name: a for a in discover_impact_deterministic()}
-        assert by_name["ml.risk_scoring_model"].entity_type == "mlModel"
-        assert by_name["pipe.risk_scoring_pipeline"].entity_type == "dataFlow"
-        assert by_name["dash.supervisory_submission_pack"].entity_type == "dashboard"
-        assert by_name[ANCHOR].entity_type == "dataset"
-        assert by_name[ANCHOR].urn == f"urn:li:dataset:(urn:li:dataPlatform:snowflake,{ANCHOR},PROD)"
+        expected = {
+            ANCHOR: ("dataset", f"urn:li:dataset:(urn:li:dataPlatform:snowflake,{ANCHOR},PROD)"),
+            "report.regulatory_risk_report": (
+                "dataset",
+                "urn:li:dataset:(urn:li:dataPlatform:snowflake,report.regulatory_risk_report,PROD)"),
+            "ml.risk_scoring_model": (
+                "mlModel", "urn:li:mlModel:(urn:li:dataPlatform:mlflow,ml.risk_scoring_model,PROD)"),
+            "dash.supervisory_submission_pack": (
+                "dashboard", "urn:li:dashboard:(powerbi,dash.supervisory_submission_pack)"),
+            "dash.capital_reporting_dashboard": (
+                "dashboard", "urn:li:dashboard:(powerbi,dash.capital_reporting_dashboard)"),
+            "pipe.risk_model_training": (
+                "dataJob",
+                "urn:li:dataJob:(urn:li:dataFlow:(airflow,pipe.risk_model_training,PROD),pipe.risk_model_training)"),
+            "pipe.risk_scoring_pipeline": (
+                "dataJob",
+                "urn:li:dataJob:(urn:li:dataFlow:(airflow,pipe.risk_scoring_pipeline,PROD),pipe.risk_scoring_pipeline)"),
+        }
+        for name, (kind, urn) in expected.items():
+            assert (by_name[name].entity_type, by_name[name].urn) == (kind, urn), name
+
+    def test_every_assets_kind_is_the_entity_type_in_its_own_urn(self):
+        for a in discover_impact_deterministic():
+            assert a.urn.startswith(f"urn:li:{a.entity_type}:"), (a.name, a.urn)
+        counts: dict[str, int] = {}
+        for a in discover_impact_deterministic():
+            counts[a.entity_type] = counts.get(a.entity_type, 0) + 1
+        assert counts == {"dataset": 3, "mlModel": 1, "dataJob": 3, "dashboard": 3}
 
 
 # ── The scenario arithmetic ─────────────────────────────────────────────────
@@ -112,6 +152,20 @@ class TestScenarios:
         assert minimum.inaction_total == round(se.P_SUPERVISORY_PENALTY * 0.4 * se.PENALTY_CONSEQUENCE)
         assert minimum.opportunity_total == round(se.DISPLACED_INITIATIVE_VALUE * 0.2)
         assert minimum.duration_months == 5
+
+    def test_model_and_reports_are_found_by_entity_type_not_by_name(self):
+        # A model is an mlModel entity whatever it is called, and a dataset that only
+        # has "model" in its name is not one. A pipeline named "...reporting..." is a
+        # job, not a report; a dashboard is a report whatever it is called.
+        named_model_but_dataset = [asset("risk.model_inputs")]
+        assert se.build_scenarios(named_model_but_dataset, 12)[0].cost_of_action[1].value == 0
+        model_by_type = [asset("x.scorer", "mlModel")]
+        assert se.build_scenarios(model_by_type, 12)[0].cost_of_action[1].value == se.ML_MODEL_REBUILD_COST
+
+        job_named_reporting = [asset("pipe.capital_reporting_pipeline", "dataJob")]
+        assert se.build_scenarios(job_named_reporting, 12)[0].cost_of_action[2].value == 0
+        dashboard_by_type = [asset("x.exec_view", "dashboard")]
+        assert se.build_scenarios(dashboard_by_type, 12)[0].cost_of_action[2].value == se.REPORT_RECERT_COST
 
     def test_no_model_in_scope_means_no_rebuild_cost_and_a_confident_zero(self):
         act, _, _ = se.build_scenarios([asset("risk.customer_risk_profile")], 12)
@@ -168,6 +222,17 @@ class TestCard:
         assert p["glossary_term"] == f"RegLens.RCS-2026.{a.recommendation}"
         assert p["targets"] == [x.urn for x in a.affected_assets]
         assert a.regulation_id in p["description"] and a.recommendation in p["description"]
+
+    def test_writeback_targets_are_typed_urns_one_per_asset_matching_the_card(self):
+        a = build_assessment("RCS-2026", discover_impact_deterministic())
+        targets = writeback_payload(a)["targets"]
+        assert len(set(targets)) == len(a.affected_assets)
+        for asset_, urn in zip(a.affected_assets, targets):
+            assert urn.split(":")[2] == asset_.entity_type, (asset_.name, urn)
+        assert "urn:li:mlModel:(urn:li:dataPlatform:mlflow,ml.risk_scoring_model,PROD)" in targets
+        assert "urn:li:dashboard:(powerbi,dash.risk_committee_report)" in targets
+        assert not any(t.startswith("urn:li:dataset:") and ("dash." in t or "ml." in t or "pipe." in t)
+                       for t in targets), "nothing is still a dataset stand-in"
 
     def test_renderings_show_every_scenario_and_the_recommendation(self):
         a = build_assessment("RCS-2026", discover_impact_deterministic())

@@ -11,21 +11,27 @@
       "role": "Per-customer risk tier. Directly in scope for RCS-2026."
     },
     {
-      "urn": "urn:li:dataset:(urn:li:dataPlatform:snowflake,ml.risk_scoring_model,PROD)",
-      "name": "ml.risk_scoring_model",
-      "entity_type": "mlModel",
-      "role": "Model that assigns risk tiers. Retrain/revalidate is the expensive part of RCS-2026."
+      "urn": "urn:li:dataJob:(urn:li:dataFlow:(airflow,pipe.risk_model_training,PROD),pipe.risk_model_training)",
+      "name": "pipe.risk_model_training",
+      "entity_type": "dataJob",
+      "role": "Trains and revalidates the risk scoring model on the customer risk profile."
     },
     {
-      "urn": "urn:li:dataset:(urn:li:dataPlatform:snowflake,dash.risk_committee_report,PROD)",
+      "urn": "urn:li:dashboard:(powerbi,dash.risk_committee_report)",
       "name": "dash.risk_committee_report",
       "entity_type": "dashboard",
       "role": "Monthly risk committee report."
     },
     {
-      "urn": "urn:li:dataset:(urn:li:dataPlatform:snowflake,pipe.risk_scoring_pipeline,PROD)",
+      "urn": "urn:li:mlModel:(urn:li:dataPlatform:mlflow,ml.risk_scoring_model,PROD)",
+      "name": "ml.risk_scoring_model",
+      "entity_type": "mlModel",
+      "role": "Model that assigns risk tiers. Retrain/revalidate is the expensive part of RCS-2026."
+    },
+    {
+      "urn": "urn:li:dataJob:(urn:li:dataFlow:(airflow,pipe.risk_scoring_pipeline,PROD),pipe.risk_scoring_pipeline)",
       "name": "pipe.risk_scoring_pipeline",
-      "entity_type": "dataFlow",
+      "entity_type": "dataJob",
       "role": "Scores customers nightly using the model."
     },
     {
@@ -35,13 +41,13 @@
       "role": "Regulatory risk report submitted to the supervisor. In scope for RCS-2026."
     },
     {
-      "urn": "urn:li:dataset:(urn:li:dataPlatform:snowflake,pipe.capital_reporting_pipeline,PROD)",
+      "urn": "urn:li:dataJob:(urn:li:dataFlow:(airflow,pipe.capital_reporting_pipeline,PROD),pipe.capital_reporting_pipeline)",
       "name": "pipe.capital_reporting_pipeline",
-      "entity_type": "dataFlow",
+      "entity_type": "dataJob",
       "role": "Feeds the capital adequacy calculation."
     },
     {
-      "urn": "urn:li:dataset:(urn:li:dataPlatform:snowflake,dash.supervisory_submission_pack,PROD)",
+      "urn": "urn:li:dashboard:(powerbi,dash.supervisory_submission_pack)",
       "name": "dash.supervisory_submission_pack",
       "entity_type": "dashboard",
       "role": "Supervisory submission pack."
@@ -53,7 +59,7 @@
       "role": "Capital adequacy calculation input."
     },
     {
-      "urn": "urn:li:dataset:(urn:li:dataPlatform:snowflake,dash.capital_reporting_dashboard,PROD)",
+      "urn": "urn:li:dashboard:(powerbi,dash.capital_reporting_dashboard)",
       "name": "dash.capital_reporting_dashboard",
       "entity_type": "dashboard",
       "role": "Board-level capital reporting dashboard."
@@ -65,9 +71,9 @@
       "cost_of_action": [
         {
           "label": "People / engineering",
-          "value": 1620000,
+          "value": 1800000,
           "unit": "GBP",
-          "assumption": "9 affected assets x \u00a3180,000",
+          "assumption": "10 affected assets x \u00a3180,000",
           "confidence": 0.6
         },
         {
@@ -79,9 +85,9 @@
         },
         {
           "label": "Report re-certification",
-          "value": 1500000,
+          "value": 1250000,
           "unit": "GBP",
-          "assumption": "6 regulatory reports/dashboards x \u00a3250,000",
+          "assumption": "5 regulatory reports/dashboards x \u00a3250,000",
           "confidence": 0.6
         },
         {
@@ -93,7 +99,7 @@
         },
         {
           "label": "Programme overhead",
-          "value": 1084000,
+          "value": 1070000,
           "unit": "GBP",
           "assumption": "20% PMO/change",
           "confidence": 0.7
@@ -127,14 +133,14 @@
       "cost_of_action": [
         {
           "label": "People / engineering (scoped)",
-          "value": 891000,
+          "value": 990000,
           "unit": "GBP",
           "assumption": "Rule-level changes, no full model rebuild",
           "confidence": 0.5
         },
         {
           "label": "Report re-certification",
-          "value": 825000,
+          "value": 687500,
           "unit": "GBP",
           "assumption": "Re-cert only directly-affected reports",
           "confidence": 0.55
@@ -148,7 +154,7 @@
         },
         {
           "label": "Programme overhead",
-          "value": 399200,
+          "value": 391500,
           "unit": "GBP",
           "assumption": "20% PMO/change",
           "confidence": 0.7
@@ -189,7 +195,7 @@
         },
         {
           "label": "Future implementation uplift",
-          "value": 780480,
+          "value": 770400,
           "unit": "GBP",
           "assumption": "~12% dearer once deferred",
           "confidence": 0.4
@@ -227,7 +233,7 @@
     }
   ],
   "recommendation": "MINIMUM_COMPLIANCE",
-  "rationale": "MINIMUM_COMPLIANCE has the lowest expected total cost (\u00a34,235,200) vs next-best DEFER (\u00a35,180,480); margin \u00a3945,280. Meets the letter via rule patch; full model rebuild scheduled later.",
+  "rationale": "MINIMUM_COMPLIANCE has the lowest expected total cost (\u00a34,189,000) vs next-best DEFER (\u00a35,170,400); margin \u00a3981,400. Meets the letter via rule patch; full model rebuild scheduled later.",
   "confidence": 0.53,
-  "assessment_date": "2026-08-08"
+  "assessment_date": "2026-09-18"
 }

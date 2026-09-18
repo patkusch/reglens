@@ -1,5 +1,5 @@
 # Core: DataHub SDK (seed + SDK write-back path)
-acryl-datahub>=1.0.0
+acryl-datahub>=1.1.0.1   # first release with the Dashboard, MLModel and DataJob SDK entities
 
 # Agent <-> DataHub MCP server (stdio). The server itself is run via `uvx`.
 mcp>=1.0.0

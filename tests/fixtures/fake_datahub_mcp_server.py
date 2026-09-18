@@ -2,26 +2,45 @@
 trip without Docker/DataHub/uvx.
 
 Its lineage graph is deliberately NOT reglens/seed/graph.py's Northstar graph:
-different node names, a fan-out (one node with five children), a four-hop-deep
-chain, a convergence (two parents feeding one child), and a genuine cycle
-(cycle.node_a <-> cycle.node_b). A parser that can only get the right answer by
-knowing Northstar's shape in advance has no way to get this graph right by
-coincidence.
+different node names, a fan-out (one node with five children), a six-hop-deep
+chain, a convergence (three parents feeding one dashboard), and a genuine cycle
+(syn.cycle_node_a <-> syn.cycle_node_b). A parser that can only get the right
+answer by knowing Northstar's shape in advance has no way to get this graph
+right by coincidence.
 
-Speaks the exact response shape acryldata/mcp-server-datahub's `get_lineage`
-tool returns for a downstream query (verified against its `tools/lineage.py`
-and `GetEntityLineage` GraphQL query):
+It is a MIXED-TYPE graph, and every entity carries the URN and the fields the
+real tool returns for its type. Verified against acryldata/mcp-server-datahub:
+`tools/lineage.py` runs the `GetEntityLineage` GraphQL query in
+`gql/entity_details.gql`, whose `entityPreview` fragment selects, per type:
+
+    Dataset    urn:li:dataset:(urn:li:dataPlatform:<p>,<name>,<env>)
+               name, platform, properties{name,description}, subTypes
+    Dashboard  urn:li:dashboard:(<tool>,<id>)
+               tool, dashboardId, platform, properties{name,description}
+    Chart      urn:li:chart:(<tool>,<id>)
+               tool, chartId, properties{name,description}
+    MLModel    urn:li:mlModel:(urn:li:dataPlatform:<p>,<name>,<env>)
+               name, description, origin, platform     (NO `properties`)
+    DataJob    urn:li:dataJob:(urn:li:dataFlow:(<orchestrator>,<flow>,<env>),<job>)
+               jobId, dataFlow{urn,orchestrator,flowId,cluster,properties},
+               properties{name,description}
+
+and the tool wraps them as
 
     {"downstreams": {"searchResults": [
-        {"entity": {"urn": ..., "type": ..., "name"?: ..., "properties"?: {...}},
-         "degree": <int, or "3+" once DataHub buckets far hops>},
+        {"entity": {"urn": ..., "type": "DATASET" | "DASHBOARD" | "ML_MODEL" |
+                    "DATA_JOB" | "CHART", ...}, "degree": <int>},
         ...
     ], "offset": 0, "returned": N, "hasMore": False}}
 
-Only Dataset entities get a top-level "name" (matching DataHub's GraphQL
-`entityPreview` fragment, where `Dataset.name` is a direct field but Dashboard/
-MLModel/DataFlow/Chart only expose `properties.name`) — so a parser that only
-ever reads the top-level "name" would silently mis-name most of this graph.
+The edges only use pairs DataHub can actually store (see
+reglens.seed.graph.DATAHUB_LINEAGE_EDGES): a model is reached through the job
+that trains it and left through the job that uses it, dashboards consume
+datasets and charts, and there is no direct dataset -> model edge.
+
+Two nodes are traps for a parser that trusts the wrong signal: a dataset whose
+`subTypes` says "Dashboard" (still a dataset), and names that say nothing about
+the entity type (`syn.scorer_v1` is a model, `syn.shared_view` is a dashboard).
 
 Run directly as a subprocess over stdio; see tests/test_mcp_lineage_roundtrip.py.
 """
@@ -36,6 +55,10 @@ except ImportError:  # mcp 2.x renamed FastMCP -> MCPServer
 
 PLATFORM = "snowflake"
 ENV = "PROD"
+DASHBOARD_TOOL = "powerbi"
+CHART_TOOL = "looker"
+MODEL_PLATFORM = "mlflow"
+ORCHESTRATOR = "airflow"
 
 # Same URN shape as reglens.seed.graph.dataset_urn(), and the same anchor name
 # reglens_agent.ANCHOR uses, so the round-trip test queries the exact anchor
@@ -43,11 +66,6 @@ ENV = "PROD"
 # the seeded Northstar graph.
 ANCHOR_NAME = "risk.customer_risk_profile"
 ANCHOR_URN = f"urn:li:dataset:(urn:li:dataPlatform:{PLATFORM},{ANCHOR_NAME},{ENV})"
-
-
-def _urn(name: str) -> str:
-    return f"urn:li:dataset:(urn:li:dataPlatform:{PLATFORM},{name},{ENV})"
-
 
 # name -> (DataHub EntityType, description). None of these names appear
 # anywhere in reglens/seed/graph.py.
@@ -57,32 +75,53 @@ NODES: dict[str, tuple[str, str]] = {
     "syn.branch_3": ("DATASET", "Fan-out branch 3."),
     "syn.branch_4": ("DATASET", "Fan-out branch 4."),
     "syn.branch_5": ("DATASET", "Fan-out branch 5."),
-    "syn.model_from_branch_1": ("ML_MODEL", "Model scored from branch 1."),
-    "syn.shared_report": ("DASHBOARD", "Dashboard fed by both branch 1 and branch 2."),
-    "syn.deep_pipeline": ("DATA_FLOW", "Pipeline three hops downstream."),
-    "syn.deepest_chart": ("CHART", "Chart four hops downstream."),
+    "syn.train_job": ("DATA_JOB", "Job that trains the scorer from branch 1."),
+    "syn.scorer_v1": ("ML_MODEL", "Model trained on branch 1."),
+    "syn.scoring_job": ("DATA_JOB", "Job that runs the scorer."),
+    "syn.scored_output": ("DATASET", "Dataset the scoring job writes."),
+    "syn.exec_view": ("DASHBOARD", "Dashboard six hops downstream."),
+    "syn.chart_4": ("CHART", "Chart built from branch 4."),
+    "syn.shared_view": ("DASHBOARD", "Dashboard fed by branch 1, branch 2 and chart 4."),
     "syn.cycle_node_a": ("DATASET", "First half of a lineage cycle."),
     "syn.cycle_node_b": ("DATASET", "Second half of a lineage cycle."),
     "syn.leaf_4": ("DATASET", "Leaf fed only by branch 4."),
     "syn.leaf_5": ("DATASET", "Leaf fed only by branch 5."),
+    "syn.tagged_dashboard": ("DATASET", "A dataset whose subtype tag says Dashboard."),
 }
 
-# upstream -> [downstream, ...], rooted at the anchor. Fan-out, depth-4 chain,
-# a convergence, and a genuine cycle.
+# upstream -> [downstream, ...], rooted at the anchor: fan-out, a six-hop chain
+# through a training job, a model and a scoring job, a convergence, a cycle.
 EDGES: dict[str, list[str]] = {
     ANCHOR_NAME: [
         "syn.branch_1", "syn.branch_2", "syn.branch_3", "syn.branch_4", "syn.branch_5",
     ],
-    "syn.branch_1": ["syn.model_from_branch_1", "syn.shared_report"],
-    "syn.branch_2": ["syn.shared_report"],
+    "syn.branch_1": ["syn.train_job", "syn.shared_view"],
+    "syn.branch_2": ["syn.shared_view"],
     "syn.branch_3": ["syn.cycle_node_a"],
-    "syn.branch_4": ["syn.leaf_4"],
-    "syn.branch_5": ["syn.leaf_5"],
-    "syn.shared_report": ["syn.deep_pipeline"],
-    "syn.deep_pipeline": ["syn.deepest_chart"],
+    "syn.branch_4": ["syn.leaf_4", "syn.chart_4"],
+    "syn.branch_5": ["syn.leaf_5", "syn.tagged_dashboard"],
+    "syn.chart_4": ["syn.shared_view"],
+    "syn.train_job": ["syn.scorer_v1"],
+    "syn.scorer_v1": ["syn.scoring_job"],
+    "syn.scoring_job": ["syn.scored_output"],
+    "syn.scored_output": ["syn.exec_view"],
     "syn.cycle_node_a": ["syn.cycle_node_b"],
     "syn.cycle_node_b": ["syn.cycle_node_a"],
 }
+
+
+def _urn(name: str) -> str:
+    """The URN DataHub uses for this node, by its entity type."""
+    etype = NODES[name][0] if name in NODES else "DATASET"
+    if etype == "DASHBOARD":
+        return f"urn:li:dashboard:({DASHBOARD_TOOL},{name})"
+    if etype == "CHART":
+        return f"urn:li:chart:({CHART_TOOL},{name})"
+    if etype == "ML_MODEL":
+        return f"urn:li:mlModel:(urn:li:dataPlatform:{MODEL_PLATFORM},{name},{ENV})"
+    if etype == "DATA_JOB":
+        return f"urn:li:dataJob:(urn:li:dataFlow:({ORCHESTRATOR},{name},{ENV}),{name})"
+    return f"urn:li:dataset:(urn:li:dataPlatform:{PLATFORM},{name},{ENV})"
 
 
 def _downstream_closure(anchor: str) -> list[tuple[str, int]]:
@@ -101,15 +140,51 @@ def _downstream_closure(anchor: str) -> list[tuple[str, int]]:
     return [(n, degree[n]) for n in order]
 
 
+def _platform(name: str) -> dict:
+    return {"urn": f"urn:li:dataPlatform:{name}", "name": name}
+
+
 def _entity_dict(name: str) -> dict:
+    """The `entity` object the real tool returns for this node's type."""
     etype, desc = NODES[name]
-    entity: dict = {"urn": _urn(name), "type": etype}
+    urn = _urn(name)
     if etype == "DATASET":
-        # Dataset entities carry a top-level `name` per DataHub's GraphQL
-        # entityPreview fragment.
-        entity["name"] = name
-    entity["properties"] = {"name": name, "description": desc}
-    return entity
+        entity = {
+            "urn": urn, "type": "DATASET", "name": name, "platform": _platform(PLATFORM),
+            "properties": {"name": name, "description": desc},
+            "subTypes": {"typeNames": ["Table"]},
+        }
+        if name == "syn.tagged_dashboard":
+            entity["subTypes"] = {"typeNames": ["Dashboard"]}
+        return entity
+    if etype == "DASHBOARD":
+        return {
+            "urn": urn, "type": "DASHBOARD", "tool": DASHBOARD_TOOL, "dashboardId": name,
+            "platform": _platform(DASHBOARD_TOOL),
+            "properties": {"name": name, "description": desc},
+        }
+    if etype == "CHART":
+        return {
+            "urn": urn, "type": "CHART", "tool": CHART_TOOL, "chartId": name,
+            "properties": {"name": name, "description": desc},
+        }
+    if etype == "ML_MODEL":
+        # MLModel is selected with top-level name/description/origin and no `properties`.
+        return {
+            "urn": urn, "type": "ML_MODEL", "name": name, "description": desc,
+            "origin": ENV, "platform": _platform(MODEL_PLATFORM),
+        }
+    if etype == "DATA_JOB":
+        return {
+            "urn": urn, "type": "DATA_JOB", "jobId": name,
+            "dataFlow": {
+                "urn": f"urn:li:dataFlow:({ORCHESTRATOR},{name},{ENV})",
+                "orchestrator": ORCHESTRATOR, "flowId": name, "cluster": ENV,
+                "properties": {"name": name},
+            },
+            "properties": {"name": name, "description": desc},
+        }
+    raise ValueError(etype)
 
 
 srv = _MCPServerImpl("fake-datahub-lineage-test")

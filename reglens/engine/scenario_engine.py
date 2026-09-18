@@ -31,13 +31,19 @@ FUTURE_IMPL_UPLIFT = 0.12                # implementation gets ~12% dearer if de
 
 
 def _is_ml(asset: AffectedAsset) -> bool:
-    return asset.entity_type.lower() in {"mlmodel", "ml model", "ml.model"} or \
-        "model" in asset.name.lower()
+    """A model is an MLModel entity — decided by its type, not by what it is called."""
+    return asset.entity_type == "mlModel"
 
 
 def _is_report(asset: AffectedAsset) -> bool:
+    """A regulatory report is a Dashboard entity, or a dataset that holds a report's
+    data. Pipelines, models and charts are never counted, whatever their names say."""
+    if asset.entity_type == "dashboard":
+        return True
+    if asset.entity_type != "dataset":
+        return False
     n = asset.name.lower()
-    return any(k in n for k in ("report", "dashboard", "submission", "pack"))
+    return any(k in n for k in ("report", "submission", "pack"))
 
 
 def build_scenarios(

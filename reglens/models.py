@@ -31,7 +31,7 @@ class AffectedAsset:
     """One node in the DataHub graph that the regulation touches."""
     urn: str
     name: str
-    entity_type: str             # dataset | mlModel | dataFlow | dashboard | chart
+    entity_type: str             # DataHub URN entity type: dataset | dashboard | mlModel | dataJob | chart ...
     role: str = ""               # why it matters, e.g. "downstream regulatory report"
 
 
