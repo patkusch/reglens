@@ -45,8 +45,8 @@ so the next person or agent inherits the assessment instead of rediscovering it.
      RegLens searches DataHub + walks lineage        ← MCP READ
                     │
                     ▼
-      9 affected assets discovered automatically
-      (3 datasets · 1 ML model · 2 pipelines · 3 reports)
+      10 affected assets discovered automatically
+      (3 datasets · 1 ML model · 3 pipelines · 3 dashboards)
                     │
                     ▼
      Scenario engine costs ACT NOW / DEFER / MIN. COMPLIANCE
@@ -94,12 +94,15 @@ source .env
 pip install -r requirements.txt
 ```
 
-### 3. Seed the fictional bank (~22 assets + lineage)
+### 3. Seed the fictional bank (20 assets + lineage)
 ```bash
 python -m reglens.seed.seed_northstar
 ```
-Then in the UI, search **`customer_risk_profile`** and open its **downstream
-lineage** — you should see the chain out to `capital_reporting_dashboard`. That
+The seed writes each asset as the DataHub entity it really is: tables as
+datasets, the three reports as **dashboards**, the risk model as an **ML model**,
+and each pipeline as a **data flow holding one data job**. Then in the UI, search
+**`customer_risk_profile`** and open its **downstream lineage** — you should see
+the chain out to `capital_reporting_dashboard`, passing through the model. That
 lineage is what the agent traverses.
 
 ### 4. ✅ Prove the MCP round-trip (the critical handshake)
@@ -123,7 +126,8 @@ python -m reglens.agent.reglens_agent --reg RCS-2026 --no-mcp --dry-run
 ```
 After a real write-back, refresh `customer_risk_profile` in the UI: the glossary
 term `RegLens.RCS-2026.<decision>` and the assessment description are now on the
-asset. **That's the money shot.** 💰
+asset — and on the dashboards, the model and the jobs too, each written as its
+own kind of entity. **That's the money shot.** 💰
 
 ### 6. Check the glass box
 ```bash
@@ -135,7 +139,11 @@ expected path, re-run the demo against
 [`examples/sample_assessment.json`](examples/sample_assessment.json) so the
 committed example cannot drift from the code, and drive a real (subprocess,
 stdio) MCP round trip against a fake DataHub MCP server to prove the lineage
-parser reads whatever the server actually returns.
+parser reads whatever the server actually returns — a mix of datasets,
+dashboards, an ML model, data jobs and a chart, each with the URN and fields
+DataHub uses for its type. They also build the seeded dashboards, model and jobs
+with the real DataHub SDK classes and check the exact aspects and lineage that
+would be sent, and run the write-back against a stand-in client.
 
 ---
 
@@ -160,8 +168,8 @@ parser reads whatever the server actually returns.
 ```
 reglens/
   seed/
-    graph.py            # the fictional bank: ~22 assets + lineage (dependency-free)
-    seed_northstar.py   # writes graph.py into DataHub via the SDK
+    graph.py            # the fictional bank: 20 assets + lineage (dependency-free)
+    seed_northstar.py   # writes graph.py into DataHub via the SDK, one real entity type per asset
     regulations.py      # RCS-2026 (fictional reg, fictional regulator)
   engine/
     scenario_engine.py  # transparent cost model — every £ has an assumption + confidence
@@ -174,25 +182,68 @@ reglens/
   models.py             # shared dataclasses
 ```
 
-### What's real vs. what's a documented shortcut
+### What's real vs. what's still simplified
 - ✅ **Real:** DataHub graph, MCP read round-trip — including genuinely parsing
-  the lineage result (see below) — scenario engine, SDK write-back, human gate.
-- ✅ **MCP lineage parse, tightened:** `discover_impact_via_mcp()` used to call
-  the MCP server, throw the response away, and return the deterministic closure
-  of the *same* seeded graph regardless of what came back. It now parses the
-  server's actual `get_lineage` response (`reglens/agent/lineage_parser.py`) —
-  every URN, name, entity type and hop count in the resulting assets comes from
-  that response, not from `reglens/seed/graph.py`. Proven in
+  the lineage result — scenario engine, SDK write-back, human gate.
+- ✅ **MCP lineage parse:** `discover_impact_via_mcp()` parses the server's
+  actual `get_lineage` response (`reglens/agent/lineage_parser.py`) — every URN,
+  name, entity type and hop count in the resulting assets comes from that
+  response, not from `reglens/seed/graph.py`. Proven in
   `tests/test_mcp_lineage_roundtrip.py`, which drives a real stdio MCP round
   trip against a fake DataHub MCP server whose lineage graph has a different
-  shape (a fan-out, a 4-hop chain, a convergence, a cycle) from the seeded
+  shape (a fan-out, a six-hop chain, a convergence, a cycle) from the seeded
   Northstar graph, so the old shortcut couldn't have passed it by coincidence.
   It still falls back to the deterministic closure if the server is
   unreachable or the response is unexpected, so the demo never dies mid-take.
-- 🔧 **Shortcut (documented, safe to ship):** Reports/pipelines/model are still
-  seeded as `Dataset`s with subtypes for uniform lineage handling. Promoting
-  them to real `Dashboard`/`MLModel` entities remains an optional upgrade,
-  marked `TODO` in `reglens/seed/seed_northstar.py`.
+- ✅ **Real entity types, no more dataset stand-ins.** Reports and the model
+  used to be seeded as `Dataset`s with a subtype tag. They are now what they
+  claim to be:
+
+  | In the bank | DataHub entity | URN |
+  |---|---|---|
+  | tables | `Dataset` | `urn:li:dataset:(urn:li:dataPlatform:snowflake,<name>,PROD)` |
+  | the three dashboards | `Dashboard` | `urn:li:dashboard:(powerbi,<id>)` |
+  | the risk model | `MLModel` | `urn:li:mlModel:(urn:li:dataPlatform:mlflow,<name>,PROD)` |
+  | each pipeline | `DataFlow` + `DataJob` | `urn:li:dataJob:(urn:li:dataFlow:(airflow,<flow>,PROD),<job>)` |
+
+  Each lineage edge is stored the way DataHub stores it for that pair of types:
+  dashboards read datasets through `DashboardInfo.datasetEdges`; jobs read and
+  write datasets through `DataJobInputOutput`; the model is linked to jobs
+  through `MLModelProperties.trainingJobs` and `.downstreamJobs`. The parser
+  decides a node's kind from the entity type in its URN, not from any tag, and
+  the write-back sends each assessment to the entity type its URN names
+  (`DashboardInfo`, `MLModelProperties`, `DataJob` and `Dataset` aspects).
+- ⚠️ **One thing had to change in the graph to make this honest.** DataHub has
+  no direct dataset → model edge: a model is reached through the job that
+  trains it. So the seed gained a training job (`pipe.risk_model_training`),
+  and the blast radius is now 10 assets, not 9. The engine now recognises a
+  model and a report by their entity type instead of by name, so the sample
+  card's figures moved slightly (recommendation and confidence unchanged).
+
+**Still simplified**
+- **Not yet run against a live DataHub.** The seed, the write-back and the
+  fake MCP server are checked offline: the real SDK classes build every entity
+  and the tests read their URNs, aspects and lineage back, and the response
+  shapes come from the `mcp-server-datahub` source, not from a live server. The
+  first run against `datahub docker quickstart` is still to do.
+- **The seed is thin.** It writes owners, descriptions and (for tables only) a
+  schema. It does not seed tags, custom properties, domains or glossary terms;
+  the only term in the graph is the one RegLens writes back. Dashboards, the
+  model and jobs have no schema (DataHub has none for them), so the model's
+  and dashboards' example fields in `graph.py` are not written anywhere.
+- **Each pipeline is one flow with one job**, the job named after the flow.
+  Real pipelines have many tasks.
+- **The write-back replaces the description** on each asset with the
+  assessment (on dashboards and the model that is their own description, on
+  tables and jobs the human-edited one), as it did before. It does not append.
+- **The fallback still reads `graph.py`.** With `--no-mcp` (or if the server
+  is down) discovery walks the seeded graph, not DataHub.
+- **The cost model is unchanged** and still a set of named assumptions; report
+  tables are still recognised by name ("report", "submission", "pack").
+- **The MCP mutation helpers in `mcp_client.py` are unused and stale.** Their
+  argument names don't match the real `update_description` and
+  `add_glossary_terms` tools (`entity_urn`, `term_urns`/`entity_urns`); the agent
+  writes back through the SDK, so it is not affected.
 
 > ⚠️ The regulation **RCS-2026** and its issuer are **fictional on purpose**, so RegLens
 > makes no claim about real-world regulation.
