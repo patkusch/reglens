@@ -56,7 +56,7 @@ so the next person or agent inherits the assessment instead of rediscovering it.
           Impact & Decision Card  →  human approves     ← HUMAN GATE
                     │
                     ▼
-   Decision written back onto every affected asset       ← MCP / SDK WRITE
+   Decision written back onto every affected asset       ← SDK WRITE
    (glossary term + description, visible in DataHub UI)
 ```
 
@@ -109,9 +109,10 @@ lineage is what the agent traverses.
 ```bash
 python -m reglens.agent.mcp_client        # prints the tools your MCP server exposes
 ```
-If this lists tools including a `search`/`lineage` read tool and a
-glossary/description mutation tool, **you are done de-risking — ship is now a
-matter of build, not luck.**
+If this lists tools including a `search`/`lineage` read tool, **you are done
+de-risking — ship is now a matter of build, not luck.** The write-back does not
+need the server's mutation tools (`update_description`, `add_terms`); the listing
+also says whether they are switched on.
 
 ### 5. Run the agent
 ```bash
@@ -141,9 +142,12 @@ committed example cannot drift from the code, and drive a real (subprocess,
 stdio) MCP round trip against a fake DataHub MCP server to prove the lineage
 parser reads whatever the server actually returns — a mix of datasets,
 dashboards, an ML model, data jobs and a chart, each with the URN and fields
-DataHub uses for its type. They also build the seeded dashboards, model and jobs
-with the real DataHub SDK classes and check the exact aspects and lineage that
-would be sent, and run the write-back against a stand-in client.
+DataHub uses for its type. The same fake also offers the real
+`update_description` and `add_terms` tools, and refuses any argument name they
+do not have, to test the optional MCP write-back helpers. They also build the
+seeded dashboards, model and jobs with the real DataHub SDK classes and check the
+exact aspects and lineage that would be sent, and run the write-back against a
+stand-in client.
 
 ---
 
@@ -175,10 +179,10 @@ reglens/
     scenario_engine.py  # transparent cost model — every £ has an assumption + confidence
     impact_card.py      # renders the Impact & Decision Card + write-back payload
   agent/
-    mcp_client.py       # async wrapper over the DataHub MCP server (stdio via uvx)
+    mcp_client.py       # async wrapper over the DataHub MCP server (stdio via uvx); reads are used, mutation helpers are optional
     lineage_parser.py   # parses the MCP server's actual get_lineage response shape
     reglens_agent.py    # orchestrator + CLI + human-approval gate
-    writeback.py        # reliable SDK write-back path
+    writeback.py        # SDK write-back path (the one the agent uses)
   models.py             # shared dataclasses
 ```
 
@@ -240,10 +244,21 @@ reglens/
   is down) discovery walks the seeded graph, not DataHub.
 - **The cost model is unchanged** and still a set of named assumptions; report
   tables are still recognised by name ("report", "submission", "pack").
-- **The MCP mutation helpers in `mcp_client.py` are unused and stale.** Their
-  argument names don't match the real `update_description` and
-  `add_glossary_terms` tools (`entity_urn`, `term_urns`/`entity_urns`); the agent
-  writes back through the SDK, so it is not affected.
+- **The MCP write-back helpers are an optional path that the agent does not use.**
+  `DataHubMCP.update_description` and `.add_glossary_terms` (`mcp_client.py`) now
+  call the real tools with their real names and arguments (`update_description(
+  entity_urn, operation, description, column_path)` and `add_terms(term_urns,
+  entity_urns, column_paths)`, quoted from `acryldata/mcp-server-datahub` in the
+  code). They were wrong before: they sent `urn`/`term`, and looked for a glossary
+  tool by a name the server does not use. They are tested against the fake MCP
+  server only (`tests/test_mcp_mutation_roundtrip.py`), never a live DataHub. The
+  server hides these tools unless it runs with `TOOLS_IS_MUTATION_ENABLED=true`
+  (RegLens sets it) and DataHub is OSS 1.4+ / Cloud 0.3.16+; when they are missing
+  the helper stops with an error that says so. They are not wired into the agent
+  because `add_terms` refuses a glossary term that does not exist yet, and RegLens
+  never creates one (the SDK path only references it), so on a fresh DataHub the
+  MCP write-back would fail where the SDK one works. The agent writes back through
+  the SDK.
 
 > ⚠️ The regulation **RCS-2026** and its issuer are **fictional on purpose**, so RegLens
 > makes no claim about real-world regulation.
