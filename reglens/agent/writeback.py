@@ -1,9 +1,13 @@
-"""Reliable SDK write-back path (fallback / alternative to the MCP mutation tools).
+"""SDK write-back path: the one the agent uses.
 
 The requirement to *use* the MCP server is satisfied by the READ path. The
-write-back can go through MCP mutation tools (preferred, one integration) or the
-SDK (rock-solid). This module is the SDK path, so your demo's "agent writes the
-decision back into DataHub" always works even if MCP mutation tool names drift.
+write-back goes through the DataHub SDK because it needs nothing but a token and a
+GMS URL, and it does not depend on the MCP server's mutation tools being switched
+on. `DataHubMCP.update_description` / `add_glossary_terms` in agent/mcp_client.py
+can do the same over MCP, but they are an optional, unwired path, tested only
+against a fake MCP server; the agent never calls them. One difference to know
+about: the MCP `add_terms` tool rejects a glossary term that does not exist in
+DataHub yet, whereas this path just references the term's URN.
 
 Each target is written as the entity type its URN says it is: the SDK reads the
 URN's entity type (`urn:li:dashboard:...`, `urn:li:mlModel:...`,
