@@ -2,7 +2,11 @@
 acryl-datahub>=1.1.0.1   # first release with the Dashboard, MLModel and DataJob SDK entities
 
 # Agent <-> DataHub MCP server (stdio). The server itself is run via `uvx`.
-mcp>=1.0.0
+# Floor is >=1.28.1, not just >=1.0.0: PYSEC-2026-3483 (deprecated websocket_server()
+# transport accepted no Host/Origin validation) is fixed there. Doesn't touch this
+# code path — we only use stdio, never mcp.server.websocket — but a floor that can
+# resolve to a patched-elsewhere release for no reason isn't a floor worth keeping.
+mcp>=1.28.1
 
 # Optional: LLM driver for the regulatory-analysis reasoning step.
 # The core loop runs fully deterministic without this.
