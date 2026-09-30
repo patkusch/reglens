@@ -4,7 +4,7 @@
 
 ### A regulatory-change **investment-decision** agent, built on DataHub.
 
-*Don't just find what a regulation touches — decide what to do about it.*
+*Don't just find what a regulation touches, decide what to do about it.*
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
