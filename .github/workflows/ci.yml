@@ -6,11 +6,16 @@ on:
 jobs:
   install:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The README promises Python 3.10+; 3.14 is the newest.
+        python-version: ["3.10", "3.11", "3.14"]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
-          python-version: "3.11"
+          python-version: ${{ matrix.python-version }}
           cache: pip
       - run: pip install -r requirements.txt -r requirements-dev.txt
       - run: python -m compileall -q reglens
