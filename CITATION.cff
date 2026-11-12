@@ -7,4 +7,4 @@ authors:
   - family-names: "Kusch"
     given-names: "Patricia"
 repository-code: "https://github.com/patkusch/reglens"
-license: MIT
+license: Apache-2.0
