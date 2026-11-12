@@ -1,0 +1,10 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "reglens"
+abstract: "Works out which systems a new regulation touches, using the data lineage in DataHub, and recommends whether to act now, wait, or do the minimum."
+type: software
+authors:
+  - family-names: "Kusch"
+    given-names: "Patricia"
+repository-code: "https://github.com/patkusch/reglens"
+license: MIT
