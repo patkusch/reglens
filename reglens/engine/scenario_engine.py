@@ -10,7 +10,7 @@ every number. Swap the constants for your own; the point is the reasoning is leg
 """
 from __future__ import annotations
 
-from reglens.models import AffectedAsset, Assessment, Estimate, Scenario
+from reglens.models import AffectedAsset, Estimate, Scenario
 
 # ---- Tunable assumptions (GBP). Edit freely; each surfaces in the card. ----
 COST_PER_AFFECTED_ASSET = 180_000        # eng + analysis to touch one asset
